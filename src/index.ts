@@ -142,15 +142,22 @@ function logHelpMessage(
 async function getTools(
   { tools, dir, template }: Argv,
   extraTools?: ExtraTool[],
+  templateName?: string,
 ) {
   // Check if tools are specified via CLI options
   const parsedTools = parseToolsOption(tools);
+
+  // Filter extraTools based on templateName
+  const filteredExtraTools = extraTools?.filter((tool) => {
+    const when = tool.when ?? (() => true);
+    return !templateName || when(templateName);
+  });
 
   if (parsedTools !== null) {
     const toolsArr = parsedTools.filter(
       (tool) =>
         BUILTIN_TOOLS.includes(tool) ||
-        extraTools?.some((extraTool) => extraTool.value === tool),
+        filteredExtraTools?.some((extraTool) => extraTool.value === tool),
     );
     return toolsArr;
   }
@@ -165,17 +172,21 @@ async function getTools(
     { value: 'prettier', label: 'Prettier - formatting' },
   ];
 
-  if (extraTools) {
+  if (filteredExtraTools) {
     const normalize = (tool: ExtraTool) => ({
       value: tool.value,
       label: tool.label,
       hint: tool.command,
     });
     options.unshift(
-      ...extraTools.filter((tool) => tool.order === 'pre').map(normalize),
+      ...filteredExtraTools
+        .filter((tool) => tool.order === 'pre')
+        .map(normalize),
     );
     options.push(
-      ...extraTools.filter((tool) => tool.order !== 'pre').map(normalize),
+      ...filteredExtraTools
+        .filter((tool) => tool.order !== 'pre')
+        .map(normalize),
     );
   }
 
@@ -252,6 +263,12 @@ type ExtraTool = {
    * If undefined, the tool will be displayed after built-in tools.
    */
   order?: 'pre' | 'post';
+  /**
+   * Condition to determine whether this tool should be displayed.
+   * If returns false, the tool will not be shown in the selection.
+   * @default () => true
+   */
+  when?: (templateName: string) => boolean;
 };
 
 function runCommand(command: string, cwd: string, packageManager: string) {
@@ -385,7 +402,7 @@ export async function create({
   }
 
   const templateName = await getTemplateName(argv);
-  const tools = await getTools(argv, extraTools);
+  const tools = await getTools(argv, extraTools, templateName);
 
   const srcFolder = path.join(root, `template-${templateName}`);
   const commonFolder = path.join(root, 'template-common');
