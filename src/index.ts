@@ -150,7 +150,7 @@ async function getTools(
   // Filter extraTools based on templateName
   const filteredExtraTools = extraTools?.filter((tool) => {
     const when = tool.when ?? (() => true);
-    return !templateName || when(templateName);
+    return templateName ? when(templateName) : true;
   });
 
   if (parsedTools !== null) {
